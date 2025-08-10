@@ -18,7 +18,7 @@ graph TD
 ```
 
 ---
-
+```
 📂 프로젝트 구조
 seocho_project/
 ├── main.tf                 # 루트 모듈
@@ -32,7 +32,7 @@ seocho_project/
 │   ├── cloudfront/          # CloudFront 배포 및 정책
 │   ├── acm/                 # ACM 인증서 발급
 │   └── route53/             # DNS 레코드 설정
-
+```
 
 ---
 
