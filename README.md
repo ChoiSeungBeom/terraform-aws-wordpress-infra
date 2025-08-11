@@ -37,19 +37,49 @@
 ---
 
 ```
-## 📂 디렉토리 구조
-seocho_project/
-├── main.tf # 루트 모듈
-├── variables.tf # 변수 선언
-├── terraform.tfvars # 환경 변수 값
-├── modules/
-│ ├── vpc/ # VPC 및 네트워크
-│ ├── ec2/ # EC2 + UserData 스크립트
-│ ├── rds/ # RDS(MariaDB)
-│ ├── alb/ # Application Load Balancer
-│ ├── cloudfront/ # CloudFront 배포 및 정책
-│ ├── acm/ # ACM 인증서
-│ └── route53/ # DNS 레코드
+## 디렉토리 구조
+
+📂 dev-infra-wp
+└── seocho_project
+    ├── main.tf
+    ├── variables.tf
+    ├── outputs.tf
+    ├── terraform.tfvars
+    ├── versions.tf
+    └── modules
+        ├── vpc
+        │   ├── main.tf          # VPC, Subnet, IGW, NAT, Route table
+        │   ├── variables.tf
+        │   └── outputs.tf
+        ├── ec2
+        │   ├── main.tf          # Launch Template / ASG / SG
+        │   ├── user_data.sh     # WP 설치 & 프록시 HTTPS 인식
+        │   ├── variables.tf
+        │   └── outputs.tf
+        ├── rds
+        │   ├── main.tf          # MariaDB 인스턴스 / 파라미터 / SG
+        │   ├── variables.tf
+        │   └── outputs.tf
+        ├── alb
+        │   ├── main.tf          # ALB, Listener(443), Rules
+        │   ├── variables.tf
+        │   └── outputs.tf
+        ├── cloudfront
+        │   ├── main.tf          # Distribution, Cache/Origin Policies
+        │   ├── variables.tf
+        │   └── outputs.tf
+        ├── route53
+        │   ├── main.tf          # A/AAAA/ALIAS (도메인, origin)
+        │   ├── variables.tf
+        │   └── outputs.tf
+        ├── acm
+        │   ├── main.tf          # us-east-1(CF), ap-northeast-2(ALB) 인증서
+        │   ├── variables.tf
+        │   └── outputs.tf
+        └── bastion
+            ├── main.tf          # Bastion EC2 & SG (옵션)
+            ├── variables.tf
+            └── outputs.tf
 
 ```
 
