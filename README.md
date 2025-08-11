@@ -29,8 +29,6 @@ Terraform으로 **CloudFront → ALB(HTTPS) → EC2(ASG, WordPress) → RDS(MySQ
 - **ACM (for ALB)**: **ap-northeast-2**에 배치 (오리진 HTTPS)
 - **프로토콜**: Client→CF **HTTPS**, CF→ALB **HTTPS**, ALB→EC2 **HTTP:80**
 
-> 이미지 파일은 레포 내 `docs/architectures/` 폴더에 저장하세요.  
-> 파일명: `infra-architecture.png`, `tls-acm-architecture.png`
 
 ---
 
