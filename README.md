@@ -4,11 +4,10 @@
 Terraform으로 **CloudFront → ALB(HTTPS) → EC2(ASG, WordPress) → RDS(MySQL)** 인프라를 자동 구축합니다.  
 도메인(Route 53)과 인증서(ACM: us-east-1/서울)까지 포함해 **`terraform apply` 한 번**으로 HTTPS 환경의 WordPress를 배포합니다.
 
-- 상태: **구현 완료(실행 검증)** · 운영 확장 가능
-- 모듈: VPC, ALB, EC2(Launch Template/ASG/UserData), RDS, CloudFront, Route 53, ACM, Bastion(옵션)
-- 네이밍: `project_name` 접두사로 리소스/태그 일관성
+- 상태: **구현 완료(실행 검증)** 
+- 모듈: VPC, ALB, EC2(Launch Template/ASG/UserData), RDS, CloudFront, Route 53, ACM, Bastion
 - 보안: RDS Private Subnet 격리, SG 최소권한(EC2 SG 참조), HTTPS 강제
-
+- Author: Beom · [Velog link](https://velog.io/@go_sbchi/project-tpb)
 ---
 
 ## 🏗 Architecture
@@ -52,16 +51,9 @@ Terraform으로 **CloudFront → ALB(HTTPS) → EC2(ASG, WordPress) → RDS(MySQ
 
 ---
 
-## 빠른 시작
-```bash
-terraform init
-terraform fmt -recursive && terraform validate
-terraform plan  -var-file="terraform.tfvars"
-terraform apply -var-file="terraform.tfvars"
-```
 
 ## 요구사항
-- Terraform ≥ 1.5
+
 - AWS 자격 증명(profile 또는 env)
 - Route 53 호스티드 존
 
@@ -78,24 +70,10 @@ terraform apply -var-file="terraform.tfvars"
 | `instance_class` | RDS 클래스 | RDS 인스턴스 |
 | `db_name`/`db_user`/`db_password` | DB 정보 | RDS 생성, EC2 UserData의 `wp-config.php` 치환 |
 
-예시(`terraform.tfvars.example`)
-```hcl
-project_name   = "tpb"
-domain         = "example.com"
-allowed_ip     = "1.2.3.4/32"
-key_name       = "YOUR_KEY_NAME"
-ami_id         = "ami-xxxxxxxx"
-instance_type  = "t3.nano"
-instance_class = "db.t3.micro"
-db_name        = "wordpress"
-db_user        = "admin"
-db_password    = "<set-in-your-own-tfvars>"
-```
 
 ---
 
-## 구현 스크린샷 (선택)
-> 이미지를 `tpb-project/docs/screens/` 폴더에 넣고 아래 경로를 맞춰주세요.
+## 구현 스크린샷 
 
 - **Route 53 — Alias 레코드**  
   `docs/screens/02-route53-alias.png`  
@@ -131,12 +109,39 @@ db_password    = "<set-in-your-own-tfvars>"
 ---
 
 ## 트러블슈팅
-- **HTTPS 미동작** → ALB 443 리스너/ACM 연결 확인
-- **리다이렉션 루프** → `wp-config.php` HTTPS 인지 코드 및 Nginx `fastcgi_param HTTPS` 확인
-- **DNS 전파 지연** → Route 53 TTL/전파시간(수분~수십분) 고려
-- **CF 캐시 무효화** → 변경 반영 필요 시 Invalidation 수행
+## 🧰 Troubleshooting (Quick)
+
+- **HTTPS 안 됨 / 4xx**
+  - 체크: ALB **:443 리스너**에 올바른 **ACM(ap-northeast-2)** 연결
+  - 커맨드: `curl -I https://<도메인>` → `HTTP/2 200` & `X-Cache: Hit/Miss from cloudfront`
+
+- **리다이렉션 루프**
+  - 체크: `wp-config.php`에 `X-Forwarded-Proto`/`CloudFront-Forwarded-Proto` 처리 포함,  
+    Nginx `fastcgi_param HTTPS $xfp_https;`
+  - 커맨드: `grep -n "FORCE_SSL_ADMIN" /var/www/html/wp-config.php`
+
+- **DNS 안 붙음**
+  - 체크: Route 53 A(ALIAS) → **CloudFront / ALB** 맞는지
+  - 커맨드: `dig +short <도메인>` / `dig +short origin.<도메인>`
+
+- **CloudFront 캐시 반영 지연**
+  - 조치: Invalidation 실행 (`/*` 또는 경로 지정)
+  - 체크: 응답 헤더 `X-Cache: Hit/Miss from cloudfront`, `X-Amz-Cf-Pop`
+
+- **Target Group Unhealthy**
+  - 체크: 헬스체크 **path=/wp-login.php**, **matcher=200–399**, EC2 보안그룹에 **ALB SG** 허용
+  - EC2: `sudo journalctl -u nginx --no-pager -n 100`
+
+- **DB 연결 실패**
+  - 체크: RDS SG에 **EC2 SG 참조**로 3306 허용, RDS **Public access=No**
+  - EC2: `nc -vz <rds-endpoint> 3306` / `mysql -h <rds-endpoint> -u <user> -p`
+
+- **ALB 403(오리진 잠금 사용 시)**
+  - 체크: CF → ALB **비밀 헤더** 이름/값 일치, ALB 룰 우선순위(1)
+
+
 
 ---
 
 
-- Author: Beom · [Velog link](https://velog.io/@go_sbchi/project-tpb)
+
