@@ -1,0 +1,23 @@
+# 프로젝트 네이밍/태그 (모든 모듈 공통)
+project_name   = "name"
+
+# 도메인 (ACM[us-east-1, 서울], CloudFront aliases, Route53 레코드, origin.${domain} 생성에 사용)
+domain         = "example.com"
+
+# SSH 허용 IP (Bastion 보안그룹 ingress에 사용)
+allowed_ip     = "1.2.3.4/32"
+
+# SSH 키 페어 이름 (Bastion EC2, Web EC2/ASG Launch Template에 사용)
+key_name       = "키페어 이름"
+
+# 컴퓨팅 이미지/타입 (Bastion EC2, Web EC2/ASG 공통 사용)
+ami_id         = "ami-xxxxxxxx"   # 리전 맞는 AMI로 교체
+instance_type  = "t3.nano"        # 필요시 Bastion/Web 분리 변수로 확장 가능
+
+# RDS 인스턴스 클래스 (RDS 생성 시 사용)
+instance_class = "db.t3.micro"
+
+# WordPress DB 설정 (RDS 생성 및 EC2 UserData의 wp-config.php 치환에 사용)
+db_name        = "wordpress"
+db_user        = "admin"
+db_password    = "password"

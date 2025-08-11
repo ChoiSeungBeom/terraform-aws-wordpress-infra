@@ -1,0 +1,11 @@
+# terraform.tfvars
+db_name        = "wordpress"
+db_user        = "admin"
+db_password    = "secure-password"
+instance_class = "db.t3.micro"
+ami_id         = "ami-08943a151bd468f4e"
+instance_type  = "t3.nano"
+key_name       = "AWS_Project_Seocho"
+allowed_ip     = "114.202.26.108/32"
+domain         = "beom.cloud"
+project_name   = "tpb"
