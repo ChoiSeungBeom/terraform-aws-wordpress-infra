@@ -1,138 +1,144 @@
-# 🌐 AWS WordPress HTTPS 인프라 자동화 (Terraform)
+# 🌐 TPB Project — AWS WordPress HTTPS Infra (Terraform)
 
-![AWS](https://img.shields.io/badge/AWS-232F3E?style=flat&logo=amazon-aws&logoColor=white)
-![Terraform](https://img.shields.io/badge/Terraform-7B42BC?style=flat&logo=terraform&logoColor=white)
-![WordPress](https://img.shields.io/badge/WordPress-21759B?style=flat&logo=wordpress&logoColor=white)
-![Nginx](https://img.shields.io/badge/Nginx-009639?style=flat&logo=nginx&logoColor=white)
-![MariaDB](https://img.shields.io/badge/MariaDB-003545?style=flat&logo=mariadb&logoColor=white)
+## 프로젝트 설명
+Terraform으로 **CloudFront → ALB(HTTPS) → EC2(ASG, WordPress) → RDS(MySQL)** 인프라를 자동 구축합니다.  
+도메인(Route 53)과 인증서(ACM: us-east-1/서울)까지 포함해 **`terraform apply` 한 번**으로 HTTPS 환경의 WordPress를 배포합니다.
 
----
-
-## 📌 프로젝트 개요
-이 프로젝트는 Terraform을 활용해 AWS에 **HTTPS 지원 WordPress 인프라**를 자동으로 구축합니다.  
-**CloudFront → ALB → EC2(WordPress) → RDS(MariaDB)** 구성으로 고가용성과 보안성을 확보했으며,  
-도메인과 SSL 인증서 발급까지 전부 한 번의 `terraform apply`로 가능합니다.
+- 상태: **구현 완료(실행 검증)** · 운영 확장 가능
+- 모듈: VPC, ALB, EC2(Launch Template/ASG/UserData), RDS, CloudFront, Route 53, ACM, Bastion(옵션)
+- 네이밍: `project_name` 접두사로 리소스/태그 일관성
+- 보안: RDS Private Subnet 격리, SG 최소권한(EC2 SG 참조), HTTPS 강제
 
 ---
 
-## 🏗 아키텍처
-![architecture](docs/architecture.png)
+## 🏗 Architecture
 
-> **요약**  
-> - **CloudFront**: 글로벌 CDN + HTTPS 강제  
-> - **ALB**: 로드 밸런싱 + HTTPS 종료  
-> - **EC2**: Nginx + PHP-FPM + WordPress 설치 자동화  
-> - **RDS**: 외부 접근 차단, EC2만 접속 가능  
-> - **Route 53 + ACM**: 도메인 연결 및 인증서 관리  
+### 1) WordPress Infra on AWS
+![WordPress Infra Architecture](docs/architectures/infra-architecture.png)
 
----
+- **DNS**: Route 53 — `root/www → CloudFront`, `origin → ALB` (A-ALIAS)
+- **CDN/SSL**: CloudFront (ACM in **us-east-1**), HTTPS 강제
+- **오리진**: ALB(HTTPS) → EC2 Auto Scaling (UserData로 WP 자동 설치)
+- **DB**: RDS(MySQL 8), Private Subnet, EC2 SG만 허용
+- **네트워킹**: VPC, Public/Private Subnet, NAT GW(기본 1개, 옵션: AZ별)
 
-## ✨ 주요 특징
-- **완전 자동화**: 인프라 생성, WordPress 설치, DB 연결, HTTPS 적용까지 자동
-- **보안 강화**: ALB 및 RDS 보안그룹 구성, HTTP→HTTPS 리다이렉션
-- **확장성**: Auto Scaling Group과 Launch Template 기반
-- **환경변수화**: `terraform.tfvars`로 환경별 배포 가능
-- **최적화된 캐싱**: CloudFront Cache Policy + Origin Request Policy 적용
+### 2) TLS/ACM Architecture
+![TLS/ACM Architecture](docs/architectures/tls-acm-architecture.png)
 
----
+- **ACM (for CloudFront)**: **us-east-1**에 배치 (CloudFront 제약)
+- **ACM (for ALB)**: **ap-northeast-2**에 배치 (오리진 HTTPS)
+- **프로토콜**: Client→CF **HTTPS**, CF→ALB **HTTPS**, ALB→EC2 **HTTP:80**
 
-```
-## 디렉토리 구조
-
-📂 dev-infra-wp
-└── seocho_project
-    ├── main.tf
-    ├── variables.tf
-    ├── outputs.tf
-    ├── terraform.tfvars
-    ├── versions.tf
-    └── modules
-        ├── vpc
-        │   ├── main.tf          # VPC, Subnet, IGW, NAT, Route table
-        │   ├── variables.tf
-        │   └── outputs.tf
-        ├── ec2
-        │   ├── main.tf          # Launch Template / ASG / SG
-        │   ├── user_data.sh     # WP 설치 & 프록시 HTTPS 인식
-        │   ├── variables.tf
-        │   └── outputs.tf
-        ├── rds
-        │   ├── main.tf          # MariaDB 인스턴스 / 파라미터 / SG
-        │   ├── variables.tf
-        │   └── outputs.tf
-        ├── alb
-        │   ├── main.tf          # ALB, Listener(443), Rules
-        │   ├── variables.tf
-        │   └── outputs.tf
-        ├── cloudfront
-        │   ├── main.tf          # Distribution, Cache/Origin Policies
-        │   ├── variables.tf
-        │   └── outputs.tf
-        ├── route53
-        │   ├── main.tf          # A/AAAA/ALIAS (도메인, origin)
-        │   ├── variables.tf
-        │   └── outputs.tf
-        ├── acm
-        │   ├── main.tf          # us-east-1(CF), ap-northeast-2(ALB) 인증서
-        │   ├── variables.tf
-        │   └── outputs.tf
-        └── bastion
-            ├── main.tf          # Bastion EC2 & SG (옵션)
-            ├── variables.tf
-            └── outputs.tf
-
-```
+> 이미지 파일은 레포 내 `docs/architectures/` 폴더에 저장하세요.  
+> 파일명: `infra-architecture.png`, `tls-acm-architecture.png`
 
 ---
 
-## ⚙ 사전 준비
-- AWS 계정 (Administrator 권한 IAM User)
-- Terraform >= 1.5
-- Route 53에 등록된 도메인
+## Workflow
+
+### 1) 런타임 요청 흐름 (Runtime Request Flow)
+1. **사용자 → Route 53** : DNS 조회
+2. **사용자 → CloudFront (HTTPS)** : TLS 종단(ACM in us-east-1), 캐시/정책 적용
+3. **CloudFront → ALB (HTTPS)** : `origin_protocol_policy = "https-only"` (TLS1.2+)
+4. **ALB → EC2(Target Group, HTTP:80)** : 헬스체크(200–399), ASG 스케일
+5. **EC2 → RDS(MySQL)** : Private Subnet 통신(외부 비공개)
+6. **응답** : EC2 → ALB → CloudFront(캐시/압축) → 사용자
+
+> 프록시 환경 인지: `wp-config.php` & Nginx에서 `X-Forwarded-Proto`/`CloudFront-Forwarded-Proto` 처리로 HTTPS URL 고정
+
+### 2) 프로비저닝 배포 흐름 (Provisioning Flow)
+1. `terraform init` → 프로바이더/플러그인 초기화(us-east-1 별도 provider 포함)
+2. `terraform plan` → 변경사항 검토
+3. `terraform apply` → VPC → ALB/EC2/ASG → RDS → ACM(검증) → CloudFront → Route 53 순
+4. 검증 → `https://<도메인>` 접속, `curl -I`의 `X-Cache` 확인, TG Healthy 확인
 
 ---
 
-## 🚀 배포 방법
+## 빠른 시작
 ```bash
-# 1. Terraform 초기화
 terraform init
-
-# 2. 배포 계획 확인
-terraform plan
-
-# 3. 인프라 생성
-terraform apply -auto-approve
+terraform fmt -recursive && terraform validate
+terraform plan  -var-file="terraform.tfvars"
+terraform apply -var-file="terraform.tfvars"
 ```
----
 
-## 🔐 HTTPS 구성 흐름
-
-사용자 → HTTPS → CloudFront → HTTPS → ALB → HTTP → EC2(WordPress)
-
-
-- CloudFront: TLS 인증 및 글로벌 캐시
-- ALB: ACM 인증서 기반 HTTPS 종료
-- WordPress: 프록시 환경에서도 HTTPS 인식 가능하게 설정
+## 요구사항
+- Terraform ≥ 1.5
+- AWS 자격 증명(profile 또는 env)
+- Route 53 호스티드 존
 
 ---
 
-## ✅ 검증 체크리스트
-1. `https://도메인` 접속 시 WordPress 설치 페이지 노출
-2. 브라우저에서 SSL 인증서 정상 표시
-3. `curl -I https://도메인` 시 `X-Cache: Hit from cloudfront` 확인
-4. `https://origin.도메인` 접속 시 ALB 직통 페이지 확인
+## 변수 요약 & 사용처
+| 변수 | 설명 | 주요 사용처 |
+|---|---|---|
+| `project_name` | 리소스/태그 접두사 | 모든 모듈 네이밍/태그 |
+| `domain` | 루트 도메인 | ACM(us-east-1), CloudFront Aliases, Route 53 |
+| `allowed_ip` | SSH 허용 CIDR | Bastion SG(Ingress) |
+| `key_name` | SSH 키 페어 | Bastion/EC2 |
+| `ami_id` / `instance_type` | AMI/타입 | Bastion/EC2(Launch Template) |
+| `instance_class` | RDS 클래스 | RDS 인스턴스 |
+| `db_name`/`db_user`/`db_password` | DB 정보 | RDS 생성, EC2 UserData의 `wp-config.php` 치환 |
+
+예시(`terraform.tfvars.example`)
+```hcl
+project_name   = "tpb"
+domain         = "example.com"
+allowed_ip     = "1.2.3.4/32"
+key_name       = "YOUR_KEY_NAME"
+ami_id         = "ami-xxxxxxxx"
+instance_type  = "t3.nano"
+instance_class = "db.t3.micro"
+db_name        = "wordpress"
+db_user        = "admin"
+db_password    = "<set-in-your-own-tfvars>"
+```
 
 ---
 
-## 🛠 문제 해결 팁
-- **HTTPS 안 됨** → ALB 443 리스너에 인증서 연결 여부 확인
-- **리다이렉션 루프** → `wp-config.php`에 `X-Forwarded-Proto` 처리 코드 추가
-- **캐시 정책 오류** → `no_cache` / `cache_default` 분리
+## 구현 스크린샷 (선택)
+> 이미지를 `tpb-project/docs/screens/` 폴더에 넣고 아래 경로를 맞춰주세요.
+
+- **Route 53 — Alias 레코드**  
+  `docs/screens/02-route53-alias.png`  
+  ![Route 53 Alias](docs/screens/02-route53-alias.png)
+
+- **CloudFront — 배포/동작 정책**  
+  `docs/screens/03-cf-distribution.png`  
+  ![CloudFront Distribution](docs/screens/03-cf-distribution.png)
+
+- **ACM — us-east-1 / 서울**  
+  `docs/screens/04-acm-us-east-1.png` / `docs/screens/05-acm-seoul.png`  
+  ![ACM us-east-1](docs/screens/04-acm-us-east-1.png)
+  ![ACM ap-northeast-2](docs/screens/05-acm-seoul.png)
+
+- **ALB — 443 리스너 & 룰**  
+  `docs/screens/06-alb-listeners.png`  
+  ![ALB Listeners](docs/screens/06-alb-listeners.png)
+
+- **Target Group — Health**  
+  `docs/screens/07-tg-health.png`  
+  ![Target Group Health](docs/screens/07-tg-health.png)
+
+- **ASG / RDS / VPC**  
+  `docs/screens/08-asg.png` / `docs/screens/09-rds.png` / `docs/screens/10-vpc-subnets-nat.png`  
+  ![ASG](docs/screens/08-asg.png)
+  ![RDS](docs/screens/09-rds.png)
+  ![VPC Subnets & NAT](docs/screens/10-vpc-subnets-nat.png)
+
+- **WordPress — HTTPS 접속**  
+  `docs/screens/12-wp-https-home.png`  
+  ![WordPress over HTTPS](docs/screens/12-wp-https-home.png)
 
 ---
 
-## 📌 향후 개선
-- AWS WAF 적용해 보안 강화
-- CloudWatch 기반 모니터링/알람
-- CI/CD 파이프라인 연동
+## 트러블슈팅
+- **HTTPS 미동작** → ALB 443 리스너/ACM 연결 확인
+- **리다이렉션 루프** → `wp-config.php` HTTPS 인지 코드 및 Nginx `fastcgi_param HTTPS` 확인
+- **DNS 전파 지연** → Route 53 TTL/전파시간(수분~수십분) 고려
+- **CF 캐시 무효화** → 변경 반영 필요 시 Invalidation 수행
 
+---
+
+
+- Author: Beom · [Velog link](https://velog.io/@go_sbchi/project-tpb)
