@@ -9,12 +9,14 @@ Terraform으로 **CloudFront → ALB(HTTPS) → EC2(ASG) → RDS(MySQL)** 를 �
 - **오리진**: ALB(HTTPS) → EC2 Auto Scaling(UserData로 WP 설치)  
 - **DB**: RDS(MySQL 8), **Private Subnet**, EC2 SG 참조만 허용
 
-#### 아키텍처 다이어그램
+#### Infra-Architecture 
 
-![아키텍처 다이어그램](docs/images/architecture-overview.png)
+![아키텍처 다이어그램](docs/images/infra-architecture.png)
 
-> **무엇을 넣나**: CloudFront → ALB(HTTPS) → EC2(ASG) → RDS(MySQL) 전체 흐름과, Route 53 A(ALIAS) 및 ACM 연결 관계.  
-> **작성 팁**: diagrams.net(draw.io) 또는 Excalidraw로 제작. 퍼블릭 IP/계정 식별 정보는 제거/모자이크.
+#### TLS/ACM Architecture
+
+![TLS/ACM Architecture](docs/images/tls-acm-architecture.png)
+
 
 ## 모듈 구성
 - `modules/vpc`, `modules/alb`, `modules/ec2`, `modules/rds`, `modules/cloudfront`, `modules/route53`, `modules/acm`, `modules/bastion`
